@@ -1,9 +1,3 @@
-provider "hcloud" {
-  token = var.hcloud_token
-}
-
-
-provider "talos" {}
 
 provider "digitalocean" {
   token = var.do_token
@@ -32,6 +26,14 @@ provider "flux" {
       private_key = tls_private_key.flux.private_key_pem
     }
   }
+}
+
+provider "oci" {
+  user_ocid = var.oci.user_ocid
+  fingerprint = var.oci.fingerprint
+  tenancy_ocid = var.oci.tenancy_ocid
+  region = var.oci.region
+  private_key_path = var.oci.private_key_path  
 }
 
 

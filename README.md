@@ -1,94 +1,209 @@
-# FluxTerraCluster
-A Terraformed Kubernetes cluster in Hetzner with Flux and Talos 
+## What is it?
+It is a Kubernetes cluster for testing purposes or really small services running on a free-tier OCI instance. with Flux and written in Terraform. 
 
-## License
+It's also going to become the blueprint for [maikel.dev](https://maikel.dev/) which I intent to rewrite using Phoenix as I'm very disappointed with NextJS. 
 
-Apache 2.0 License as requested by the project sponsor. 
+## Install Terraform
 
-## Requirements:
+In NixOS this was editing configuration.nix to add "terraform" then just apply the changes. 
 
-1. Multi-instance deployment on Hetzner cloud. 
-2. Easy ongoing maintanability/upgradability (in other words, tweakable resources).
-3. Hetzner CSI for K8S storage (to avoid OpenEBS or Ceph).
-4. Talos Linux as base OS. 
-5. Flux up and running. 
-6. Hetzner LB (K8S api ingress), traefik and cert-manager defined in the repo for flux to deploy.
-7. Ampere (ARM) instances to lower the cost. 
-8. IPv4 and 6 for all. 
-9. 3xCAX11 for the control plane nodes, and 2xCAX31 for the workers. 
-10. Velero for backups to S3-type stuff.
-11. Due date max (orientative) is 7th of October preferibly but not set in stone. 
+## Install OCI CLI and test it
 
-## Desired artifact
+Once this is up and running then it is easy to ensure the variables are right in terraform since for this to work I have to assign them all. Let alone this is an exercise in Nixos dev machine design too. 
 
-A git repo (this one) with some terraform to deploy the cluster, and flux to maintain the workload. 
+Nixos has it in its package list [here](https://search.nixos.org/packages?channel=24.05&show=oci-cli&from=0&size=50&sort=relevance&type=packages&query=oci) so I can just add it, but more useful would be to be able to also configure it from configuration.nix so I'm going to find out if that's possible, that way I can replicate this across my 3 machines easily. 
 
-## Not needed
-
-* To run any of the actual services on there other than Flux, Traefik and Cert-Manager. You could run a sample workload via Flux as experiment. 
-* To use my own Hetzner account, client supplies API access to his (don't even dream of finding the keys to it here, I wasn't born yesterday, I've been doing this for a while). 
-* To create my own Talos OS snapshot, client supplies his own ready-made snapshots for this (a quick google also reveals they aren't hard to produce though). 
-
-## Optional stretch:
-
-* Being able to add x86 worker nodes (there are snapshots for this too)
-
-## How to run this:
-
-1. You'll need to create a terraform.tfvars file with content similar to terraform.tfvars-sample. In the sample one I explained each variable. Check variables.tf for clarity. 
-2. optional.tf is, as it states, optional, not part of the requirements. I use it to assign DNS names because Digital Ocean DNS is free, so by using it I make my life simpler and when Flux deploys the ingress and asks Let's Encrypt for the certificates it can already access them through their DNS names by having this in place. You can replace that (and the provider) with whatever DNS solution you use. 
-3. You'll need to point your deployment servers (servers.tf) to a snapshot image with Talos. [This link]( https://www.talos.dev/v1.5/talos-guides/install/cloud-platforms/hetzner/) explains how to create it. 
-4. For Velero backups I'm using S3 for simplicity. You can use your own Minio server easily. I do not recommend to use a Minio server that is also maintained by this very same deployment hence S3 since I don't want to code two deployments, not required. 
-5. You'll need to amend cluster/dependent/certificates/issuer.yaml to **use your own email** since this file is read by Flux directly.  
-
-Once you run a terraform apply, I usually paste this code in the shell to gain access. Obviously you need jq, talosctl and kubectl on your distribution. 
+Once installed
 
 ```bash
-terraform output -json talos_talosconfig | jq -r . > /tmp/talosconfig && export TALOSCONFIG=/tmp/talosconfig && talosctl kubeconfig /tmp/kubeconfig --force && export KUBECONFIG=/tmp/kubeconfig && alias k=kubectl
+oci setup config
 ```
 
-## Test services
-Once you run it it should show this two example services:
+And that gives me all the variables. [This sectin on the OCI documentation](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#Other) has more information about how to set it up. I created two keys, one from the console and one from the CLI just to be sure and to try two ways. 
 
-* Podinfo: in my example in https://podinfo.mkl.lol
-* Basic-nginx: in my example in https://nginx.mkl.lol
-
-The later showcases using Hetzner CSI. As Kubernetes & Talos combo has no direct way to access the volume, the simplest way to create a simple index.html file to be used by that NGINX server is by accessing the volume via any of the pods plugged to it:
+To test it works just run any command to get info, such as 👇
 
 ```bash
-kubectl get pods | grep nginx 
-# Use the name of any pod for the next, here I'm using my-nginx-5dfbdf99f7-bnxsl
-k exec -ti my-nginx-5dfbdf99f7-bnxsl -- bash
-# Create some simple index.html file with
-echo '<html><head><title>Hello World</title></head><body><h1>Hello</h1><p>World</p></body></html>' > /usr/share/nginx/html/index.html
-# Exit the pod
+oci os ns get
 ```
-Now if you navigate to https://nginx.mkl.lol you shall see the sample page. 
 
-When you delete the cluster, the volume created by this is NOT deleted, which is understandably the expected behaviour. When you re-create the cluster with Terraform it'll use a different volume (expected behaviour) unless you configured backups with Velero and restore from them in which case it'll use the old volume with your data. 
+So just amend providers.tf with the info provided or better terraform.tfvars so it's out of the repo. 
 
-## Terraform destroy
+I ended up not finding the NixOS way because anyway I configured it all in tfvars. 
+## Install the OCI providers and initialise them
 
-Normally doesn't happen but if you get stuck for any reason on resources that are going to be deleted anyway once the servers are gone, you can manually get rid of them from terraform state with 
+For the OCI providers all that is needed is this on terraform
+
+```hcl
+# providers.tf
+
+provider "oci" {
+	user_ocid = var.oci.user_ocid
+	fingerprint = var.oci.fingerprint
+	tenancy_ocid = var.oci.tenancy_ocid
+	region = var.oci.region
+	private_key_path = var.oci.private_key_path
+}
+
+# versions.tf
+
+terraform {
+	required_providers {
+		oci = { # Without this there's a conflict with hashicorp/oci
+			source = "oracle/oci"
+		}
+	}
+}
+
+# terraform.tfvars - This one is not on the repo obviously. 
+oci = {
+	user_ocid = "ocid1.user.oc1..aaaa...."
+	fingerprint = "26:37:e...."
+	tenancy_ocid = "ocid1.tenancy.oc1..aa..."
+	region = "eu-madrid-1"
+	private_key_path = "~/.oci/oci_api_key.pem" # TODO: This is the one you should modify.
+}
+```
+
+The information for the variables is what I received as the step after setting up the CLI. You don't need to look for that info manually anywhere. 
+
+## Configure Digital Ocean CLI
+
+The package is [doctl](https://search.nixos.org/packages?channel=24.05&show=doctl&from=0&size=50&sort=relevance&type=packages&query=doctl) in Nixos. I use Digital Ocean because the DNS capabilities it has are all free. 
+
+The file where the config is saved is on ~/.config/doctl/config.yaml I wanted to start from scratch so I deleted it and all API keys. 
+
+Then just
 
 ```bash
-terraform state rm RESOURCE
+doctl auth init --context default  
 ```
-When it has happened it's been kubernetes.velero or flux_bootstrap_git.this. For some reason Terraform's gone mental, deleted the load balancer first and then tried to reach the Kube cluster (impossible if the LB is missing or has target or services missing). 
-It **normally** deletes them in the right order. 
+And just paste the token. Use that same token in terraform.tfvars. To test it works
 
-## Flux fun
+```bash
+doctl balance get
+```
 
-Now, if you want to add stuff or remove stuff I recommend as point of entry the file I set up in /clusters/steph/kustomize.yaml. Why this file? Because with it I could impose some order. Basically
-- By virtue of having this file, Terraform executes it when bootstraping Flux. 
-- By virtue of not having the rest of Flux files in the /steph/ folder, Flux doesn't go mental trying to run things in the wrong order. 
-- I simplified what's independent and what isn't by separating them in folders. 
-- That single file determines with a single kind, Kustomization (flux type) what depends on what else before loading anything of those deployments. By making everything a Kustomization I can safely use depends_on without conflicts. 
+## Launch a first test instance
 
-You can add anything else (or remove it) starting from that kustomization.yaml file. e.g.: get rid of the sample nginx by removing its kustomization from it. Add your own deployment by creating a folder in either independent or dependent and recycling any of the definitions in that file to point to it. 
+This is a good milestone to check everything is correct. Stuff copied across from another project to be able to run the first instance (this is the number of stuff needed to launch an instance, since defining the instance is never enough):
+* Availability domain
+* Identity compartment
+* Virtual Cloud network
+* Public Security List
+* Public Subnet
+* Private Subnet
+* Compute machine
+## Cloud-init basic setup
 
-## Other stuff
+I'm using Ubuntu so i'm just doing enough to have a page that directs to the instance proving it works. 
 
-If you want to see my reasoning while I was (or I am, I might do more changes) coding feel free to read whatAmIupTo.md
+```bash
+#!/bin/sh
 
-Any questions I'm reachable in Matrix: @maikelthedev:matrix.org
+apt-get update
+apt-get install nginx -y
+echo "Hello World from `hostname -f`" > /var/www/html/index.html
+
+service nginx enable
+service nginx start
+
+iptables -P INPUT ACCEPT
+iptables --flush
+```
+
+You might wonder why the part of iptables. This is an annoyance I've found with Oracle Cloud Infrastructure and it is that Security Policies don't apply at OS level. So even after I defined that port 80 is open, unless in Ubuntu I accept connections from all ports, it won't let me connect to port 80. Oracle only configures the firewall at VNC level and completely ignores Ubuntu. It does work at OS level if you choose Oracle Linux. 
+
+## Configure DNS
+
+This step is required so that I don't have to keep updating the IP whenever I destroy and rebuild the environment. This is why I use Digital Ocean. 
+
+```hcl
+# domains.tf
+resource "digitalocean_record" "subdomains" {
+	for_each = { for name in var.domain.subdomains : name => name }
+	domain = var.domain.name
+	type = "A"
+	name = each.value
+	value = oci_core_instance.instance_config_arm.public_ip
+	depends_on = [
+		oci_core_instance.instance_config_arm
+	]
+}
+
+# variables.tf
+variable "domain" {
+	description = "Domain to use as example and list of strings"
+	type = object({
+		name = string
+		subdomains = list(string)
+	})
+}
+
+# terraform.tfvars
+domain = {
+	description = "Domain to use as example and list of strings"
+	name = "maikeladas.es"
+	subdomains = ["machine1", "machine2" ]
+}
+```
+
+By mere virtue of having a DNS now I can configure `.ssh/config` to allow me to access the instance independently of destroying it and launching it again. So
+
+```txt
+Host machine1
+	HostName machine1.maikeladas.es
+	User ubuntu
+```
+
+Now I can ssh into it with a simple `ssh machine1`with nothing more. 
+
+## Adding Kubernetes to the server
+
+The first part is that I like to use Docker with Kubernetes, not just containerd so I want K3S, my favourite flavour of Kubernetes with it. The reason also to use it with Docker is that gets rid of incompatibility issues with Cert-Manager later on. 
+
+This is a matter of modifying the cloud-init script to do both things.
+
+```sh
+#!/bin/sh
+apt-get update
+apt-get install nginx ca-certificates curl -y
+
+# Add Docker
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+# Add the repository to Apt sources:
+echo \
+"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+$(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt-get update
+apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+# Give the user rights to it
+usermod -aG docker ubuntu
+
+# Install k3s but using Docker as containerisation method
+curl -sfL https://get.k3s.io | sh -s - --docker
+```
+
+## Configuring local Kubectl
+
+
+## TODO
+* [x] Install Terraform
+* [x] Install the OCI providers and initialise them
+* [x] Install DOCTL providers and initialise them
+* [x] Launch an instance with basic NGINX page
+* [x] Configure basic DNS to avoid remembering IPs. 
+* [x] Add Kubernetes to the server
+* [ ] Install kubctl
+* [ ] Install Flux
+* [ ] Install Let's Encrypt
+* [ ] Serve a basic page over SSL. 
+* [ ] Serve a Phoenix project
+* [ ] Serve Fedigrindr basic template
+* [ ] Serve maikel.dev 
+* [ ] Amend README.md

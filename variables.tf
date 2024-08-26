@@ -7,33 +7,26 @@ variable "github" {
   })
 }
 
+variable "oci" {
+  type = object({
+    user_ocid = string
+    fingerprint = string
+    tenancy_ocid = string
+    region = string
+    private_key_path = string
+  })
+}
+
 
 variable "flux_cluster_path" { }
 variable "do_token" { }
-variable "aws_token" { 
-  // To get this one run in BASH 'cat /whateverfilewithAWscredentials | base64'
-}
-variable "hcloud_token" {}
-
-variable "load_balancer_config" {
-  type = object({
-    ip = string
-    name = string
-    location = string
-    type = string
-  })
-}
 
 variable "domain" {
   description = "Domain to use as example and list of strings"
   type = object({
     name = string
-    string_list = list(string)
+    subdomains = list(string)
   })
-  default = {
-    name = "mkl.lol"
-    string_list = ["podinfo", "nginx" ]
-  }
 }
 
 
@@ -62,4 +55,47 @@ variable "cluster_name" {
   description = "Name of the cluster"
   type        = string
   default     = "funky-cluster"
+}
+
+variable "compartment_config" {
+  type = object({
+    compartment_description = string
+    compartment_name        = string
+  })
+  description = "Location where  all this deployment is going to be compartimentalised"
+}
+
+variable "network_config" {
+    type = object({
+      private_subnet_cidr_block = string
+      private_subnet_name = string
+      public_subnet_cidr_block = string
+      public_subnet_name = string
+      vcn_cidrs = list(string)
+      vcn_name = string
+    })
+    description = "Details about the private & public subnets and the VCN"
+}
+
+variable "open_ports" {
+  type = list(number)
+  default = [22]
+}
+
+variable "ip_for_ssh" {
+  type = string
+  default = "94.136.7.161/32"
+}
+
+variable "instance_config_arm" {
+  type = object({
+    shape = string
+    image_id = string
+    display_name = string
+    ssh_key_path = string
+    shape_memory = number
+    shape_ocpus = number
+    userdata_file_path = string
+  })
+  description = "Details about the instance you're going to run the dev environment from"
 }

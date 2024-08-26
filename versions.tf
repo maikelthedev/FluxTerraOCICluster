@@ -1,12 +1,7 @@
 terraform {
   required_providers {
-    hcloud = {
-      source  = "hetznercloud/hcloud"
-      version = "1.42.1"
-    }
-    talos = {
-      source  = "siderolabs/talos"
-      version = "0.4.0-alpha.0"
+    oci = { # Without this there's a conflict with hashicorp/oci
+      source = "oracle/oci"
     }
     flux = {
       source  = "fluxcd/flux"
@@ -26,3 +21,4 @@ terraform {
     }
   }
 }
+
