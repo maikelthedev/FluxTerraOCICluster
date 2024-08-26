@@ -10,7 +10,6 @@ github = {
   repo = "FluxTerraCluster" # Name of the repo you want Flux to use. 
   bot_name = "Flux" # Name of the user you want Flux to use to change code in the repo. 
   org = "maikelthedev" # Name of the account in Github or Org. 
-  t0k3n = "" # Simple GIthub token for that account. 
 } 
 
 load_balancer_config = {
