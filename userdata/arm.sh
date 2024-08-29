@@ -22,12 +22,15 @@ usermod -aG docker ubuntu
 
 curl -sfL https://get.k3s.io | sh -s - --docker
 
+# Required because OCI security policies affect the VNC not the Ubuntu server. 
+iptables -P INPUT ACCEPT  
+iptables --flush 
+
+
 # This below should go once Kubernetes is up and running
 echo "Hello World from `hostname -f`" > /var/www/html/index.html
 
 service nginx enable
 service nginx start
 
-iptables -P INPUT ACCEPT  
-iptables --flush 
 

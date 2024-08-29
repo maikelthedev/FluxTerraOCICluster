@@ -83,9 +83,10 @@ variable "open_ports" {
 }
 
 variable "ip_for_ssh" {
-  type = string
-  default = "94.136.7.161/32"
+  description = "List of IP addresses allowed to access SSH"
+  type        = list(string)
 }
+
 
 variable "instance_config_arm" {
   type = object({

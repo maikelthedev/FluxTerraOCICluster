@@ -15,16 +15,18 @@ resource "oci_core_security_list" "public-security-list" {
   }
   
 
-  ingress_security_rules {
-    stateless   = false
-    source      = var.ip_for_ssh # TODO: this value dictactes who can access. 
-    source_type = "CIDR_BLOCK"
-    protocol = "6"
-    tcp_options {
-      min = 22
-      max = 22
+  dynamic "ingress_security_rules" {
+    for_each = var.ip_for_ssh
+    content {
+      stateless   = false
+      source      = ingress_security_rules.value
+      source_type = "CIDR_BLOCK"
+      protocol    = "6"
+      tcp_options {
+        min = 22
+        max = 22
+      }
     }
-    
   }
 
   dynamic "ingress_security_rules" {
