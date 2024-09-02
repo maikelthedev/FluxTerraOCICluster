@@ -25,4 +25,9 @@ resource "oci_core_instance" "instance_config_arm" {
         user_data = "${base64encode(file(var.instance_config_arm.userdata_file_path))}"   
     } 
     preserve_boot_volume = false
+
+    provisioner "local-exec" {
+        command = "echo ${self.public_ip} >> private_ips.txt"
+    }
+
 }
