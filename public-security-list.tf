@@ -69,7 +69,7 @@ resource "oci_core_security_list" "public-security-list" {
       source_type = "CIDR_BLOCK"
       protocol    = "17" # Number for UDP
 
-      tcp_options {
+      udp_options {
         min = ingress_security_rules.value
         max = ingress_security_rules.value
       }
