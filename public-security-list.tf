@@ -29,6 +29,22 @@ resource "oci_core_security_list" "public-security-list" {
     }
   }
 
+  # Mosh but only for SSH accepted PCs
+  dynamic "ingress_security_rules" {
+    for_each = var.ip_for_ssh
+    content {
+      stateless   = false
+      description = "Configuration for MOSH for each SSh authorized PC"
+      source      = ingress_security_rules.value
+      source_type = "CIDR_BLOCK"
+      protocol    = "6"
+      tcp_options {
+        min = 60000
+        max = 61000
+      }
+    }
+  }
+
   dynamic "ingress_security_rules" {
     for_each = var.open_ports
     content {
