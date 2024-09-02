@@ -29,13 +29,27 @@ resource "oci_core_security_list" "public-security-list" {
     }
   }
 
+    dynamic "ingress_security_rules" {
+    for_each = var.ip_for_ssh
+    content {
+      stateless   = false
+      source      = ingress_security_rules.value
+      source_type = "CIDR_BLOCK"
+      protocol    = "6"
+      tcp_options {
+        min = 6443
+        max = 6443
+      }
+    }
+  }
+
   dynamic "ingress_security_rules" {
     for_each = var.open_ports
     content {
       stateless   = false
       source      = "0.0.0.0/0"
       source_type = "CIDR_BLOCK"
-      protocol    = "6"
+      protocol    = "17" # Number for UDP
 
       tcp_options {
         min = ingress_security_rules.value
